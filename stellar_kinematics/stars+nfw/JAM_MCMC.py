@@ -121,7 +121,7 @@ def jam_nfw_lnprob(pars):
 # MCMC runner
 def run_mcmc_nfw(output_path, ndim, nwalkers, nsteps):
     p0 = [
-        [88, -0.1, 1.0, 3.3, 4.0, -0.75] + 0.01 * np.random.randn(ndim)
+        [88, -0.1, 1.0, 3.3, 3.25, -0.75] + 0.01 * np.random.randn(ndim)
         for _ in range(nwalkers)
     ]
 
