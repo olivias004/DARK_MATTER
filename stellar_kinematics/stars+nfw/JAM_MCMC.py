@@ -65,6 +65,9 @@ def jam_nfw_lnprob(pars):
     if not (d['p0_bounds'][0] < p0 < d['p0_bounds'][1]):
         return -np.inf
 
+
+    Rs = 10 ** Rs
+    p0 = 10 ** p0
     # # Log-normal priors for Rs and p0
     # ln_prior = (
     #     prior_log_normal(Rs, mu=np.log(2000), sigma=0.5) +

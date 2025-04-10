@@ -136,10 +136,10 @@ def prep_data(lum_mge_path, pot_mge_path, kin_data_path, output_path):
 		pickle.dump(kwargs, f)
 
 
-lum_mge_path = "/Users/livisilcock/Documents/PROJECTS/NGC5102/fits/final_lum.fits"
-pot_mge_path = "/Users/livisilcock/Documents/PROJECTS/NGC5102/fits/final_pot.fits"
-kin_data_path = "/Users/livisilcock/Documents/PROJECTS/NGC5102/fits/NGC5102_ppxf_fitted_data_SN_200.fits"
-output_path = "/Users/livisilcock/Documents/PROJECTS/NGC5102/files/JAM_NFW/kwargs.pkl"
+lum_mge_path = "/Users/livisilcock/Documents/PROJECTS/DARK_MATTER/files/mge_lum/mge_LUM.fits"
+pot_mge_path = "/Users/livisilcock/Documents/PROJECTS/DARK_MATTER/files/mge_pot/mge_POT.fits"
+kin_data_path = "/Users/livisilcock/Documents/PROJECTS/DARK_MATTER/files/kinematics/NGC5102_ppxf_fitted_data_SN_200.fits"
+output_path = "/Users/livisilcock/Documents/PROJECTS/DARK_MATTER/files/second_model/kwargs.pkl"
 
 prep_data(lum_mge_path, pot_mge_path, kin_data_path, output_path)    
 
