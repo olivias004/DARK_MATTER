@@ -12,25 +12,18 @@ from schwimmbad import MPIPool
 import sys
 
 # FUNCTIONS =================
-# Log-normal prior helper
-# def prior_log_normal(x, mu, sigma):
-#     if x <= 0:
-#         return -np.inf
-#     return -0.5 * ((np.log(x) - mu) / sigma) ** 2
 
-# mge pot
-def mge_pot(Rs, p0, arcsec_to_pc):
-    r_max = max(500, 1.2 * Rs)  # Dynamically adjust max radius
-    r = np.linspace(0.1, r_max, 50)  # Linear sampling
+# MGE potential from NFW profile
+def mge_pot(Rs, nfw_amp, arcsec_to_pc):
+    r_max = max(500, 1.2 * Rs)
+    r = np.linspace(0.1, r_max, 50)
+    r_parsec = r * arcsec_to_pc
 
-    # Convert radius to parsecs
-    r_parsec = r * d['arcsec_to_pc']
-
-    # NFW density profile
     R = r_parsec / Rs
-    intrinsic_density = p0 / (R * ((1 + R) ** 2))
+    intrinsic_density = nfw_amp / (R * (1 + R) ** 2)
 
-    # Fit 1D MGE
+    assert r_parsec.shape == intrinsic_density.shape, "Shape mismatch in mge_pot inputs"
+
     p = mge_fit_1d(
         r_parsec, intrinsic_density,
         negative=False,
@@ -43,15 +36,15 @@ def mge_pot(Rs, p0, arcsec_to_pc):
     )
 
     surf = p.sol[0, :]
-    sigma = p.sol[1, :] / d['arcsec_to_pc']
+    sigma = p.sol[1, :] / arcsec_to_pc
     qobs = np.ones_like(surf)
     return surf, sigma, qobs
 
-# JAM likelihood with NFW
+# JAM likelihood with NFW model
 def jam_nfw_lnprob(pars):
-    inc, beta, mbh, ml, Rs, p0 = pars
+    inc, beta, mbh, ml, log10_Rs, log10_nfw_amp = pars
 
-    # Bound checks
+    # Bounds check
     if not (d['inc_bounds'][0] < inc < d['inc_bounds'][1]):
         return -np.inf
     if not (d['beta_bounds'][0] < beta < d['beta_bounds'][1]):
@@ -60,26 +53,17 @@ def jam_nfw_lnprob(pars):
         return -np.inf
     if not (d['ml_bounds'][0] < ml < d['ml_bounds'][1]):
         return -np.inf
-    if not (d['Rs_bounds'][0] < Rs < d['Rs_bounds'][1]):
+    if not (d['Rs_bounds'][0] < log10_Rs < d['Rs_bounds'][1]):
         return -np.inf
-    if not (d['p0_bounds'][0] < p0 < d['p0_bounds'][1]):
+    if not (d['p0_bounds'][0] < log10_nfw_amp < d['p0_bounds'][1]):
         return -np.inf
 
+    # Convert from log10 space
+    Rs = 10 ** log10_Rs
+    nfw_amp = 10 ** log10_nfw_amp
 
-    Rs = 10 ** Rs
-    p0 = 10 ** p0
-    # # Log-normal priors for Rs and p0
-    # ln_prior = (
-    #     prior_log_normal(Rs, mu=np.log(2000), sigma=0.5) +
-    #     prior_log_normal(p0, mu=np.log(0.2), sigma=1.0)
-    # )
-
-    # if not np.isfinite(ln_prior):
-    #     return -np.inf
-
-    # DM potential component
     try:
-        surf_dm, sigma_dm, qobs_dm = mge_pot(Rs, p0, d['arcsec_to_pc'])
+        surf_dm, sigma_dm, qobs_dm = mge_pot(Rs, nfw_amp, d['arcsec_to_pc'])
         combined_surface_density = np.concatenate((d['surf_pot'], surf_dm))
         combined_sigma = np.concatenate((d['sigma_pot'], sigma_dm))
         combined_q = np.concatenate((d['qObs_pot'], qobs_dm))
@@ -87,7 +71,6 @@ def jam_nfw_lnprob(pars):
         print(f"Error in MGE construction: {e}")
         return -np.inf
 
-    # Run JAM model
     jam_result = jam_axi_proj(
         d["surf_lum"],
         d["sigma_lum"],
@@ -115,15 +98,11 @@ def jam_nfw_lnprob(pars):
     )
 
     chi2 = -0.5 * jam_result.chi2 * len(d['rms'])
-
-    if not np.isfinite(chi2):
-        return -np.inf
-
-    return chi2
+    return chi2 if np.isfinite(chi2) else -np.inf
 
 # MCMC runner
 def run_mcmc_nfw(output_path, ndim, nwalkers, nsteps):
-    p0 = [
+    initial_pos = [
         [88, -0.1, 1.0, 3.3, 3.25, -0.75] + 0.01 * np.random.randn(ndim)
         for _ in range(nwalkers)
     ]
@@ -135,7 +114,7 @@ def run_mcmc_nfw(output_path, ndim, nwalkers, nsteps):
 
         print("Starting MCMC...")
         sampler = emcee.EnsembleSampler(nwalkers, ndim, jam_nfw_lnprob, pool=pool)
-        sampler.run_mcmc(p0, nsteps, progress=True)
+        sampler.run_mcmc(initial_pos, nsteps, progress=True)
 
     print("Saving results...")
     with open(output_path, "wb") as f:
@@ -145,9 +124,8 @@ def run_mcmc_nfw(output_path, ndim, nwalkers, nsteps):
 if __name__ == "__main__":
     output_path = "/fred/oz059/olivia/NFW_samples.pkl"
     ndim = 6
-    nwalkers = 20        # Slightly more walkers = better exploration
+    nwalkers = 20
     nsteps = 500
-
 
     with open("/home/osilcock/DM_NFW_data/kwargs.pkl", "rb") as f:
         d = pickle.load(f)
